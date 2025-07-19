@@ -12,7 +12,6 @@ export class UserService {
    ) {}
 
    async createUser(dto: CreateUserDto): Promise<string> {
-    this.logger.log(`Creating a new user --${dto.email}`);
 
     try{
       const existingUser = await this.prisma.user.findUnique({
@@ -45,8 +44,31 @@ export class UserService {
       }
    }
 
+   async findUserById(id: number): Promise<{email: string, id: number, role: string | null}> {
+
+    try{
+      const user = await this.prisma.user.findUnique({
+        where: {id: id}
+      })
+
+      if(!user){
+        this.logger.error(`User with id ${id} not found`);
+        throw new BadRequestException('User not found');
+      }
+
+      this.logger.log(`User found successfully --${id}`);
+
+      return user;
+    }catch(error){
+      this.logger.error(`Error finding user with id: ${id}`, error);
+      if(error instanceof BadRequestException){
+        throw error;
+      }
+      throw new InternalServerErrorException('An error occurred while finding user by id');
+    }
+   }
+
    async findUserByEmail(email: string): Promise<{email: string, id: number, role: string | null}> {
-    this.logger.log(`Finding user by email --${email}`);
 
     try{
       const user = await this.prisma.user.findUnique({

@@ -11,6 +11,8 @@ import { UserModule } from './user/user.module';
 import { LoggerService } from './logger/logger.service';
 import { LoggerModule } from './logger/logger.module';
 import { ConfigModule } from '@nestjs/config';
+import { RedisService } from './redis/redis.service';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -24,8 +26,9 @@ import { ConfigModule } from '@nestjs/config';
     }),
     AuthModule,
     UserModule,
-    LoggerModule],
+    LoggerModule,
+    RedisModule],
   controllers: [AppController, AuthController],
-  providers: [AppService, AuthService, UserService, LoggerService,],
+  providers: [AppService, AuthService, UserService, LoggerService, RedisService,],
 })
 export class AppModule {}

@@ -15,7 +15,6 @@ export class AuthService {
     ){}
 
     async generateToken(user: {id: number, email: string, role: string | null}): Promise<string> {
-      this.logger.log(`Generating token for user with email: ${user.email}`);  
       try{
         const payload = {
             sub: user.id, 
@@ -31,7 +30,6 @@ export class AuthService {
     };
 
     async loginUser(dto: LogInUserDto){
-        this.logger.log(`Logging in user with email: ${dto.email}`);
 
         try{
             const user = await this.prisma.user.findUnique({
