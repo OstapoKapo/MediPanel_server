@@ -8,11 +8,13 @@ datasource db {
 }
 
 model User {
-  id        Int       @id @default(autoincrement())
-  password  String
-  email     String    @unique @db.VarChar(250)
-  role      String?   @default("viewer") @db.VarChar(50)
-  createdat DateTime? @default(now()) @db.Timestamp(6)
+  id         Int       @id @default(autoincrement())
+  password   String
+  email      String    @unique @db.VarChar(250)
+  role       String?   @default("viewer") @db.VarChar(50)
+  createdat  DateTime? @default(now()) @db.Timestamp(6)
+  isVerified Boolean?  @default(false) @map("is_verified")
+  is2FA      Boolean?  @default(false) @map("is_2fa")
 
   @@map("users")
 }

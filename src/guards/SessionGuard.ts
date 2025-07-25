@@ -17,21 +17,21 @@ export class SessionGuard implements CanActivate{
        const sessionId = req.cookies.sessionId;
        if(!sessionId) throw new UnauthorizedException('Session ID is missing');
 
-       const session = await this.redisService.get<{ userId: number; userRole: string; ip:string; userAgent: string }>(`session:${sessionId}`);
+       const sessionKey = `session:${sessionId}`;
+       const session = await this.redisService.get<{ userId: number; userRole: string; ip:string; userAgent: string }>(sessionKey);
        if(!session) throw new UnauthorizedException('Session not found');
 
-       const currentIp = this.normalizeIp(req.ip);
-       if(this.normalizeIp(session.ip) !== currentIp){
-        throw new UnauthorizedException('IP address mismatch');
-       }
-
-       const userAgent = req.headers['user-agent'] || 'unknown';
-       if(session.userAgent !== userAgent){
-        throw new UnauthorizedException('User agent mismatch');
-       }
+       await this.redisService.expire(sessionKey, 3600);
+    //    const currentIp = this.normalizeIp(req.ip);
+    //    if(this.normalizeIp(session.ip) !== currentIp){
+    //     throw new UnauthorizedException('IP address mismatch');
+    //    }
+    //    const userAgent = req.headers['user-agent'] || 'unknown';
+    //    if(session.userAgent !== userAgent){
+    //     throw new UnauthorizedException('User agent mismatch');
+    //    }
 
        (req as AuthenticatedReq).userId = session.userId;
-
        return true
     }
 

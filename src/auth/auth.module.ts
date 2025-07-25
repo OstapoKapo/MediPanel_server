@@ -7,6 +7,8 @@ import { LoggerService } from 'src/logger/logger.service';
 import { UserModule } from 'src/user/user.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { RedisModule } from 'src/redis/redis.module';
+import { EmailModule } from 'src/email/email.module';
+import { EmailService } from 'src/email/email.service';
 
 
 @Module({
@@ -14,17 +16,10 @@ imports: [
     PrismaModule,
     UserModule,
     RedisModule,
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
-        signOptions: { expiresIn: '2h' },
-      }),
-    }),
+    EmailModule
   ],
   controllers: [AuthController],
-  providers: [AuthService, LoggerService],
-  exports: [AuthService, JwtModule],
+  providers: [AuthService, LoggerService, EmailService],
+  exports: [AuthService],
 })
 export class AuthModule{}

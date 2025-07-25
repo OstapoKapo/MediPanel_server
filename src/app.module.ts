@@ -13,6 +13,10 @@ import { LoggerModule } from './logger/logger.module';
 import { ConfigModule } from '@nestjs/config';
 import { RedisService } from './redis/redis.service';
 import { RedisModule } from './redis/redis.module';
+import { EmailModule } from './email/email.module';
+import { EmailService } from './email/email.service';
+import { ThrottlerModule } from '@nestjs/throttler';
+
 
 @Module({
   imports: [
@@ -21,14 +25,19 @@ import { RedisModule } from './redis/redis.module';
     //   autoSchemaFile: true,
     //   playground: true,
     // }),
+    ThrottlerModule.forRoot({
+      ttlSeconds: 60,
+      limit: 5,
+    } as any),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
     AuthModule,
     UserModule,
     LoggerModule,
-    RedisModule],
+    RedisModule,
+    EmailModule],
   controllers: [AppController, AuthController],
-  providers: [AppService, AuthService, UserService, LoggerService, RedisService,],
+  providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService],
 })
 export class AppModule {}
