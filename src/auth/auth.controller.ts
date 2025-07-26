@@ -1,22 +1,24 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { CreateUserDto } from '../dto/create-user.dto';
+import { CreateUserDto } from '../common/dto/create-user.dto';
 import { UserService } from 'src/user/user.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { Response, Request } from 'express';
-import { LogInUserDto } from 'src/dto/login-user.dto';
+import { LogInUserDto } from 'src/common/dto/login-user.dto';
 import {randomUUID} from 'crypto';
 import { RedisService } from 'src/redis/redis.service';
-import { SessionGuard } from 'src/guards/SessionGuard';
+import { SessionGuard } from 'src/common/guards/Session.guard';
 import { UserId } from './user-id.decorator';
 import { EmailService } from 'src/email/email.service';
-import { ChangePasswordDto } from 'src/dto/change-password.dto';
+import { ChangePasswordDto } from 'src/common/dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
+import { BannedAccGuard } from 'src/common/guards/BannedAcc.guard';
 
 
 
 
 @Controller('auth')
+
 export class AuthController {
     constructor(
         private readonly authService: AuthService, 
@@ -27,6 +29,7 @@ export class AuthController {
     ) {}
 
     @Post('signUp')
+    @Throttle({ default: { limit: 5, ttl: 60 } })
     @HttpCode(HttpStatus.CREATED)
     async signUp(
         @Body() dto: CreateUserDto,
@@ -37,6 +40,7 @@ export class AuthController {
       return {message: 'ok'}  
     }
 
+    @UseGuards(BannedAccGuard)
     @Post('logIn')
     @Throttle({ default: { limit: 5, ttl: 60 } })
     @HttpCode(HttpStatus.OK)
@@ -45,18 +49,24 @@ export class AuthController {
         @Res({ passthrough: true }) res: Response,
         @Req() req: Request
     ){
+        const maxAttempts = 5;
+        const userAttempts = await this.redisService.get(`loginAttempts:${dto.email}`);
+
+        await this.authService.checkUserAttempts(userAttempts, maxAttempts, dto.email);
+
         const user = await this.authService.loginUser(dto);
         const sessionId = randomUUID();
 
         if(user.isVerified === false){
            const verifyToken = randomUUID();
-            await this.redisService.set(`verify:${verifyToken}`, { userId: user.id }, 1800); // 30 хвилин
+            await this.redisService.setVerifyToken(verifyToken, user.id); 
             res.cookie('verifyToken', verifyToken, {
                 httpOnly: true,
                 secure: false,
                 sameSite: 'lax',
-                maxAge: 30 * 60 * 1000, // 30 хв
+                maxAge: 30 * 60 * 1000, // 30 minutes
             });
+            await this.redisService.del(`loginAttempts:${dto.email}`);
             return { isVerified: false, message: 'User must change password' };
         }
 
@@ -65,6 +75,7 @@ export class AuthController {
         const userAgent = req.headers['user-agent'] || 'unknown';
 
         await this.authService.createSession(user.id, sessionId, user.role, ip, userAgent, res);
+        await this.redisService.del(`loginAttempts:${dto.email}`);
 
         this.logerService.log(`User logged in successfully with email: ${dto.email}`);
 
@@ -116,7 +127,8 @@ export class AuthController {
         const data = await this.redisService.get<{userId: number}>(`verify:${verifyToken}`);
         if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
 
-        const user = await this.userService.changePasswordAndIsVerified(dto.newPassword, data.userId);
+        await this.userService.changeIsVerified(data.userId)
+        const user = await this.userService.changePassword(dto.newPassword, data.userId);
 
         await this.redisService.del(`verify:${verifyToken}`);
         res.clearCookie('verifyToken', {
@@ -147,3 +159,5 @@ export class AuthController {
         return {userId: data.userId, message: 'Verify token is valid'};
     }
 }
+
+

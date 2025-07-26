@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
-import { CreateUserDto } from 'src/dto/create-user.dto';
+import { CreateUserDto } from 'src/common/dto/create-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import * as bcrypt from 'bcryptjs'
 import { LoggerService } from 'src/logger/logger.service';
@@ -102,12 +102,12 @@ export class UserService {
     }
   }
 
-  async changePasswordAndIsVerified(password: string, userId: number): Promise<{id: number, role: string | null}> {
+  async changePassword(password: string, userId: number): Promise<{id: number, role: string | null}> {
     const hashedPassword = await bcrypt.hash(password + process.env.USER_PEPER, 10);
     try{
       const user = await this.prisma.user.update({
         where: {id: userId},
-        data: {password: hashedPassword, isVerified: true}
+        data: {password: hashedPassword}
       });
 
       this.logger.log(`Password changed successfully for user with id: ${userId}`);
@@ -121,6 +121,23 @@ export class UserService {
         throw error;
       }
       throw new InternalServerErrorException('An error occurred while changing password');
+    }
+  }
+
+  async changeIsVerified(userId: number): Promise<void> {
+    try{
+      await this.prisma.user.update({
+        where: {id: userId},
+        data: {isVerified: true}
+      });
+
+      this.logger.log(`User with id ${userId} is verified successfully`);
+    }catch(error){
+      this.logger.error(`Error verifying user with id: ${userId}`, error);
+      if(error instanceof BadRequestException){
+        throw error;
+      }
+      throw new InternalServerErrorException('An error occurred while verifying user');
     }
   }
 }
