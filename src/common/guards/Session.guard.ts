@@ -1,7 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from "@nestjs/common";
 import { RedisService } from "src/redis/redis.service";
 import { Request } from "express";
-import { escape } from "querystring";
 
 
 interface AuthenticatedReq extends Request {
