@@ -28,8 +28,9 @@ export class AuthController {
         private readonly emailService: EmailService
     ) {}
 
+    @UseGuards(SessionGuard)
     @Post('signUp')
-    @Throttle({ default: { limit: 5, ttl: 60 } })
+    @Throttle({ default: { limit: 5, ttl: 60 } }) // create custom throttler guard
     @HttpCode(HttpStatus.CREATED)
     async signUp(
         @Body() dto: CreateUserDto,
@@ -93,12 +94,14 @@ export class AuthController {
         return {user}   
     }
 
+    @UseGuards(SessionGuard)
     @Post('logOut')
     @HttpCode(HttpStatus.OK)
     async logOut(
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response
     ){
+        this.logerService.log(`User is logging out...`);
         const sessionId = req.cookies.sessionId;
         if(sessionId) {
             await this.redisService.del(`session:${req.cookies.sessionId}`);
@@ -114,9 +117,9 @@ export class AuthController {
         return {message: 'Logged Out Successfully'}
     }
 
-    @Post('changePassword')
+    @Post('verifyPassword')
     @HttpCode(HttpStatus.OK)
-    async changePassword(
+    async verifyPassword(
         @Req() req: Request,
         @Res({ passthrough: true }) res: Response,
         @Body() dto: ChangePasswordDto
