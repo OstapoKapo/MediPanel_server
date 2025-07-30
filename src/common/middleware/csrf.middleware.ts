@@ -13,8 +13,8 @@ export class CsrfMiddleware implements NestMiddleware {
 
     async use(req: Request, res: Response, next: NextFunction){
         if(csrfWhiteListMethods.includes(req.method) && !csrfWhiteList.includes(req.path)) {
-            const sessionId = req.cookies?.['sessionId'];
-            const csrfHeader = req.headers?.['x-csrf-token'];
+            const sessionId = req.cookies.sessionId;
+            const csrfHeader = req.headers['x-csrf-token'];
 
             if(!sessionId || !csrfHeader) throw new ForbiddenException('Mising CSRF token or session id');
 

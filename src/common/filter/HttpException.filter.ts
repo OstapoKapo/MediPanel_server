@@ -1,6 +1,10 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
 import { Response } from "express";
 
+interface IRequestCorrelation extends Request {
+    correlationId?: string;
+}
+
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -9,7 +13,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
         const response = ctx.getResponse<Response>();
         const request = ctx.getRequest<Request>();
 
-        const correlationId = request['correlationId'];
+        const correlationId = (request as IRequestCorrelation).correlationId;
 
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
         let message = 'Internal server error';
@@ -20,7 +24,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
             message = 
                 typeof res === 'string'
                     ? res
-                    : (res as { message?: string }).message || 'Internal server error';
+                    : (res as { message?: string }).message ?? 'Internal server error';
         }
 
         const errorResponse = {
