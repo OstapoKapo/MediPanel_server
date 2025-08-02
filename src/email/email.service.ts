@@ -3,7 +3,7 @@ import { Resend } from 'resend';
 
 @Injectable()
 export class EmailService {
-    private resend: Resend;
+    private readonly resend: Resend;
     
     constructor() {
         this.resend = new Resend(process.env.RESEND_API_KEY);
@@ -37,6 +37,5 @@ export class EmailService {
         if (error) {
             return console.error({ error });
         }
-    console.log({ data });
     }
 }

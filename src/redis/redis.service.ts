@@ -14,7 +14,7 @@ export class RedisService implements OnModuleInit {
         return this.client.multi();
     }
 
-    async set(key:string, value: any, ttlSeconds?: number){
+    async set(key:string, value: unknown, ttlSeconds?: number){
         const val = JSON.stringify(value);
         if(ttlSeconds){
             await this.client.set(key, val, 'EX', ttlSeconds);
@@ -53,7 +53,7 @@ export class RedisService implements OnModuleInit {
         await this.set(`verifyToken:${verifyToken}`, {value}, RedisTTL.VERIFY_TOKEN);
     }
 
-    async setSession(sessionId: string, value: { userId: number; userRole: string | null; ip: string | unknown; userAgent: string, csrfToken: string }) {
+    async setSession(sessionId: string, value: { userId: number; userRole: string | null; ip: string | undefined ; userAgent: string, csrfToken: string }) {
         await this.set(`session:${sessionId}`, value, RedisTTL.SESSION);
     }
 }

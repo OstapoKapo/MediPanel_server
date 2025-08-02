@@ -11,8 +11,8 @@ import {v4 as uuidv4} from 'uuid';
 @Injectable()
 export class AuthService {
     constructor(
-        private readonly redisService: RedisService, // Assuming you have a RedisService for session management
-        private prisma: PrismaService,
+        private readonly redisService: RedisService, 
+        private readonly prisma: PrismaService,
         private readonly loggerService: LoggerService,
 
     ){}

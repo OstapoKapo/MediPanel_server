@@ -28,6 +28,6 @@ export class LoggerService {
   }
 
   error(message: string, trace?: string) {
-    this.logger.error(`${message} - ${trace || ''}`);
+    this.logger.error(`${message} - ${trace ?? ''}`);
   }
 }
