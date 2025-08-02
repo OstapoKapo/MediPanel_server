@@ -8,7 +8,7 @@ import {randomUUID} from 'crypto';
 @Injectable()
 export class UserService {
    constructor(
-    private prisma: PrismaService,
+    private readonly prisma: PrismaService,
     private readonly logger: LoggerService, // Assuming you have a LoggerService for logging
    ) {}
 

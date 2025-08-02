@@ -9,7 +9,7 @@ interface AuthenticatedReq extends Request {
 
 @Injectable()
 export class SessionGuard implements CanActivate{
-    constructor(private redisService: RedisService) {}
+    constructor(private readonly redisService: RedisService) {}
     
     async canActivate(context: ExecutionContext): Promise<boolean>{
        const req: Request = context.switchToHttp().getRequest();

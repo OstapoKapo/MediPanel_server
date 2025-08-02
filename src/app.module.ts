@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
@@ -15,7 +14,7 @@ import { RedisService } from './redis/redis.service';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { EmailService } from './email/email.service';
-import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
 import { RecaptchaService } from './recaptcha/recaptcha.service';
 
 
@@ -27,9 +26,13 @@ import { RecaptchaService } from './recaptcha/recaptcha.service';
     //   playground: true,
     // }),
     ThrottlerModule.forRoot({
-      ttlSeconds: 60,
-      limit: 5,
-    } as any),
+      throttlers: [
+        {
+          ttl: 60,
+          limit: 5,
+        },
+      ],
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
     }),
@@ -38,7 +41,7 @@ import { RecaptchaService } from './recaptcha/recaptcha.service';
     LoggerModule,
     RedisModule,
     EmailModule],
-  controllers: [AppController, AuthController],
+  controllers: [AuthController],
   providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService, RecaptchaService],
 })
 export class AppModule {}

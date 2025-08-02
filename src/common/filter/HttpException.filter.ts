@@ -1,8 +1,5 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from "@nestjs/common";
-import { error } from "console";
 import { Response } from "express";
-import path from "path";
-import { Http } from "winston/lib/winston/transports";
 
 
 @Catch()

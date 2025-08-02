@@ -90,7 +90,7 @@ export class AuthController {
 
 
         const ip = req.ip;
-        const userAgent = req.headers['user-agent'] || 'unknown';
+        const userAgent = req.headers['user-agent'] ?? 'unknown';
 
         await this.authService.createSession(user.id, sessionId, user.role, ip, userAgent, res);
         await this.redisService.del(`loginAttempts:${dto.email}`);
