@@ -16,6 +16,7 @@ import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { EmailService } from './email/email.service';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { RecaptchaService } from './recaptcha/recaptcha.service';
 
 
 @Module({
@@ -38,6 +39,6 @@ import { ThrottlerModule } from '@nestjs/throttler';
     RedisModule,
     EmailModule],
   controllers: [AppController, AuthController],
-  providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService],
+  providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService, RecaptchaService],
 })
 export class AppModule {}

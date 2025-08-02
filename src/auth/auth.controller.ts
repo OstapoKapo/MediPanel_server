@@ -13,7 +13,7 @@ import { EmailService } from 'src/email/email.service';
 import { ChangePasswordDto } from 'src/common/dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
 import { BannedAccGuard } from 'src/common/guards/BannedAcc.guard';
-
+import { RecaptchaService } from 'src/recaptcha/recaptcha.service';
 
 
 
@@ -25,7 +25,8 @@ export class AuthController {
         private readonly userService: UserService,
         private readonly logerService: LoggerService,
         private readonly redisService: RedisService,
-        private readonly emailService: EmailService
+        private readonly emailService: EmailService,
+        private readonly recaptchaService: RecaptchaService
     ) {}
 
     @UseGuards(SessionGuard)
@@ -50,10 +51,27 @@ export class AuthController {
         @Res({ passthrough: true }) res: Response,
         @Req() req: Request
     ){
-        const maxAttempts = 5;
+        const maxCancelledAttempts = 5;
+        const mixCaptchaAttempts = 3;
         const userAttempts = await this.redisService.get(`loginAttempts:${dto.email}`);
 
-        await this.authService.checkUserAttempts(userAttempts, maxAttempts, dto.email);
+
+        if(userAttempts && +userAttempts >= mixCaptchaAttempts && +userAttempts < maxCancelledAttempts) {
+            console.log(dto.recaptchaToken)
+            if(!dto.recaptchaToken){
+                throw new UnauthorizedException('Recaptcha token is required');
+            }
+
+            console.log(dto.recaptchaToken)
+
+            const isValid = await this.recaptchaService.verifyToken(dto.recaptchaToken);
+            if(!isValid) {
+                this.logerService.error(`Invalid recaptcha token for email: ${dto.email}`);
+                throw new UnauthorizedException('Invalid recaptcha token');
+            }
+        }
+
+        await this.authService.checkUserAttempts(userAttempts, maxCancelledAttempts, dto.email);
 
         const user = await this.authService.loginUser(dto);
         const sessionId = randomUUID();
