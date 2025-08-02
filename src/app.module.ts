@@ -14,7 +14,7 @@ import { RedisService } from './redis/redis.service';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { EmailService } from './email/email.service';
-import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RecaptchaService } from './recaptcha/recaptcha.service';
 
 
