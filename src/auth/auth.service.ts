@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { LogInUserDto } from 'src/common/dto/login-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -88,13 +88,15 @@ export class AuthService {
     }
 
     async checkUserAttempts(userAttempts: unknown, maxAttempts: number, email: string) {
-        if(userAttempts && +userAttempts >= maxAttempts){
-            await this.redisService.del(`loginAttempts:${email}`);
-            await this.redisService.setBannedUser(email);
-            this.loggerService.error(`Too many login attempts for email: ${email}`);
-            throw new UnauthorizedException('Too many login attempts');
-        }else if(!userAttempts){
-            await this.redisService.setLoginAttempts(email, 1);
+        if(userAttempts){
+            if(+userAttempts >= maxAttempts){
+                await this.redisService.del(`loginAttempts:${email}`);
+                await this.redisService.setBannedUser(email);
+                this.loggerService.error(`Too many login attempts for email: ${email}`);
+                throw new ForbiddenException('Too many login attempts');
+            }
+        }else{
+            await this.redisService.setLoginAttempts(email, 0);
         } 
     }
 };

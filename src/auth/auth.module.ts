@@ -9,6 +9,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { RedisModule } from 'src/redis/redis.module';
 import { EmailModule } from 'src/email/email.module';
 import { EmailService } from 'src/email/email.service';
+import { RecaptchaService } from 'src/recaptcha/recaptcha.service';
 
 
 @Module({
@@ -19,7 +20,7 @@ imports: [
     EmailModule
   ],
   controllers: [AuthController],
-  providers: [AuthService, LoggerService, EmailService],
+  providers: [AuthService, LoggerService, EmailService, RecaptchaService],
   exports: [AuthService],
 })
 export class AuthModule{}

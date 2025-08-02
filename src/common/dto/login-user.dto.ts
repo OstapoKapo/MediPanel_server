@@ -9,4 +9,7 @@ export class LogInUserDto {
     @ApiProperty({example: 'ffasw3f', description: 'user password'})
     @MinLength(5, {message: 'Password must be at least 5 characters long'})
     password: string;
+
+    @ApiProperty({example: 'captchaToken', description: 'Recaptcha token'})
+    recaptchaToken: string | null;
 }
