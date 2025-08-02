@@ -26,7 +26,7 @@ export class AuthService {
             });
             if(!user){
                 this.loggerService.error(`User with email ${dto.email} not found`);
-                throw new BadRequestException(`Some of the fields are incorrect`);
+                throw new UnauthorizedException(`Some of the fields are incorrect`);
             };
 
             const isPasswordValid = await bcrypt.compare(dto.password + process.env.USER_PEPER, user.password);
@@ -36,7 +36,7 @@ export class AuthService {
                     .expire(`loginAttempts:${dto.email}`, 900) 
                     .exec();
                 this.loggerService.error(`Invalid password for user with email: ${dto.email}`);
-                throw new BadRequestException(`Some of the fields are incorrect`);
+                throw new UnauthorizedException(`Some of the fields are incorrect`);
             };
 
             this.loggerService.log(`User has been logged in successfully with email: ${dto.email}`);
@@ -44,7 +44,7 @@ export class AuthService {
             return user;
         }catch(error) {
             this.loggerService.error(`Error logging in user with email: ${dto.email}`, error);
-            if(error instanceof BadRequestException) {
+            if(error instanceof UnauthorizedException) {
                 throw error; 
             };
             throw new InternalServerErrorException('An error occurred while logging in');
@@ -97,6 +97,7 @@ export class AuthService {
             }
         }else{
             await this.redisService.setLoginAttempts(email, 0);
+
         } 
     }
 };

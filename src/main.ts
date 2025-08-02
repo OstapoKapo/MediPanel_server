@@ -6,6 +6,7 @@ import * as cookieParser from 'cookie-parser';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { CsrfMiddleware } from './common/middleware/csrf.middleware';
 import { RedisService } from './redis/redis.service';
+import { HttpExceptionFilter } from './common/filter/HttpException.filter';
 
 
 async function bootstrap() {
@@ -21,9 +22,11 @@ async function bootstrap() {
     .setDescription('API for creating users')
     .setVersion('1.0')
     .build();
+  
+  app.use(CorrelationIdMiddleware);  
+  app.useGlobalFilters(new HttpExceptionFilter());
   const redisService = new RedisService();
   app.use(new CsrfMiddleware(redisService).use.bind(new CsrfMiddleware(redisService)));
-  app.use(CorrelationIdMiddleware);  
   app.use(cookieParser());
   app.useGlobalPipes(new ValidationPipe());
   const document = SwaggerModule.createDocument(app, config);
