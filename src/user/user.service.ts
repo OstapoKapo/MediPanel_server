@@ -12,7 +12,7 @@ export class UserService {
     private readonly logger: LoggerService, // Assuming you have a LoggerService for logging
    ) {}
 
-   async createUser(dto: CreateUserDto): Promise<string> {
+   async createUser(dto: CreateUserDto, ip: string, ua: string): Promise<string> {
 
     try{
       const existingUser = await this.prisma.user.findUnique({
@@ -34,6 +34,8 @@ export class UserService {
           createdat: new Date(),
           is2FA: false, // Default value,
           isVerified: false, // Default value
+          ip: ip, 
+          ua: ua
         },
       });
 

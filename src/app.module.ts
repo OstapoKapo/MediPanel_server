@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module } from '@nestjs/common';
 import { AppService } from './app.service';
 import { GraphQLModule } from '@nestjs/graphql';
 import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
@@ -14,8 +14,10 @@ import { RedisService } from './redis/redis.service';
 import { RedisModule } from './redis/redis.module';
 import { EmailModule } from './email/email.module';
 import { EmailService } from './email/email.service';
-import { ThrottlerModule, ThrottlerModuleOptions } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { RecaptchaService } from './recaptcha/recaptcha.service';
+import { CsrfMiddleware } from './common/middleware/csrf.middleware';
+import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 
 
 @Module({
@@ -44,4 +46,16 @@ import { RecaptchaService } from './recaptcha/recaptcha.service';
   controllers: [AuthController],
   providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService, RecaptchaService],
 })
-export class AppModule {}
+export class AppModule {
+  constructor(private readonly redisService: RedisService) {}
+
+  configure(consumer: MiddlewareConsumer) {
+     consumer
+      .apply(CsrfMiddleware)
+      .forRoutes('/auth/signUp', '/auth/logOut', '/auth/checkSession');
+
+    consumer
+      .apply(CorrelationIdMiddleware)
+      .forRoutes('*');  
+  }
+}

@@ -8,5 +8,5 @@ export class CreateUserDto {
 
   @ApiProperty({example: 'admin', description: 'user role'})
   @IsString()
-  role: 'admin' | 'superadmin' | 'viewer'
+  role: 'admin' | 'doctor' | 'viewer'
 }

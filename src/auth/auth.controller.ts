@@ -34,9 +34,13 @@ export class AuthController {
     @Throttle({ default: { limit: 5, ttl: 60 } }) // create custom throttler guard
     @HttpCode(HttpStatus.CREATED)
     async signUp(
+        @Req() req: Request,
         @Body() dto: CreateUserDto,
     ){
-      const data = await this.userService.createUser(dto);  
+      const ip = req.ip || 'unknown';
+      const ua = req.headers['user-agent'] || 'unknown';
+        
+      const data = await this.userService.createUser(dto, ip, ua);  
       await this.emailService.sendWelcomeEmail('OstapoKapo@gmail.com', 'Welcome to MEDIPANEL!', data); // need verify domain and then we can send to another people
       this.logerService.log(`User created successfully with email: ${dto.email}`);   
       return {message: 'ok'}  
@@ -131,6 +135,12 @@ export class AuthController {
             sameSite: 'lax',
         });
 
+        res.clearCookie('csrfToken', {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+        });
+
         this.logerService.log(`User logged out successfully`);
         return {message: 'Logged Out Successfully'}
     }
@@ -144,14 +154,13 @@ export class AuthController {
     ){
         const verifyToken = req.cookies.verifyToken;
         if(!verifyToken) throw new UnauthorizedException('Verify token is missing');
-
-        const data = await this.redisService.get<{userId: number}>(`verify:${verifyToken}`);
+        
+        const data = await this.redisService.get<{value: number}>(`verifyToken:${verifyToken}`);
         if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
+        await this.userService.changeIsVerified(data.value)
+        const user = await this.userService.changePassword(dto.newPassword, data.value);
 
-        await this.userService.changeIsVerified(data.userId)
-        const user = await this.userService.changePassword(dto.newPassword, data.userId);
-
-        await this.redisService.del(`verify:${verifyToken}`);
+        await this.redisService.del(`verifyToken:${verifyToken}`);
         res.clearCookie('verifyToken', {
             httpOnly: true,
             secure: false,
@@ -174,7 +183,7 @@ export class AuthController {
         const token = req.cookies.verifyToken;
         if(!token) throw new UnauthorizedException('Verify token is missing');
 
-        const data = await this.redisService.get<{userId: number}>(`verify:${token}`);
+        const data = await this.redisService.get<{userId: number}>(`verifyToken:${token}`);
         if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
 
         return {userId: data.userId, message: 'Verify token is valid'};
