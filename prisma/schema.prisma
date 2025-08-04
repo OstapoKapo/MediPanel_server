@@ -8,13 +8,15 @@ datasource db {
 }
 
 model User {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   password   String
-  email      String    @unique @db.VarChar(250)
-  role       String?   @default("viewer") @db.VarChar(50)
-  createdat  DateTime? @default(now()) @db.Timestamp(6)
-  isVerified Boolean?  @default(false) @map("is_verified")
-  is2FA      Boolean?  @default(false) @map("is_2fa")
+  email      String   @unique             @db.VarChar(50)
+  role       String   @default("viewer")  @db.VarChar(50)
+  createdat  DateTime @default(now())     @db.Timestamp(6)
+  isVerified Boolean  @default(false)                         @map("is_verified")
+  is2FA      Boolean  @default(false)                         @map("is_2fa")
+  ip         String                       @db.Text                
+  ua         String                       @db.Text
 
   @@map("users")
 }
@@ -22,5 +24,5 @@ model User {
 enum UserRole {
   viewer
   admin
-  superadmin
+  doctor
 }
