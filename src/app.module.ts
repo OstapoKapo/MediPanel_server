@@ -47,7 +47,7 @@ import { CorrelationIdMiddleware } from './common/middleware/correlation-id.midd
   providers: [AppService, AuthService, UserService, LoggerService, RedisService, EmailService, RecaptchaService],
 })
 export class AppModule {
-  constructor(private readonly redisService: RedisService) {}
+  constructor() {}
 
   configure(consumer: MiddlewareConsumer) {
      consumer

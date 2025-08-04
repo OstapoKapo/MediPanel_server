@@ -37,8 +37,8 @@ export class AuthController {
         @Req() req: Request,
         @Body() dto: CreateUserDto,
     ){
-      const ip = req.ip || 'unknown';
-      const ua = req.headers['user-agent'] || 'unknown';
+      const ip = req.ip ?? 'unknown';
+      const ua = req.headers['user-agent'] ?? 'unknown';
         
       const data = await this.userService.createUser(dto, ip, ua);  
       await this.emailService.sendWelcomeEmail('OstapoKapo@gmail.com', 'Welcome to MEDIPANEL!', data); // need verify domain and then we can send to another people
