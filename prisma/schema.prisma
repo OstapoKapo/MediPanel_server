@@ -11,14 +11,29 @@ model User {
   id         Int      @id @default(autoincrement())
   password   String
   email      String   @unique             @db.VarChar(50)
-  role       String   @default("viewer")  @db.VarChar(50)
+  role       UserRole @default(viewer)
   createdat  DateTime @default(now())     @db.Timestamp(6)
   isVerified Boolean  @default(false)                         @map("is_verified")
   is2FA      Boolean  @default(false)                         @map("is_2fa")
   ip         String                       @db.Text                
   ua         String                       @db.Text
-
+  securityLogs SecurityLog[]
   @@map("users")
+}
+
+model SecurityLog{
+  logID         Int       @id @default(autoincrement())
+  personID      Int
+  eventType     String                                    @db.VarChar(50)
+  ipAddress     String                                    @db.VarChar(50)
+  userAgent     String                                    @db.Text
+  eventTime     DateTime  @default(now())                 @db.Timestamp(6)
+  description   String                                    @db.Text
+  isResolved    Boolean    
+
+  person        User      @relation(fields: [personID], references: [id], onDelete: Cascade)
+
+  @@map("security_logs")                                 
 }
 
 enum UserRole {

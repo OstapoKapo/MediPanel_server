@@ -59,6 +59,9 @@ export class AuthController {
         const mixCaptchaAttempts = 3;
         const userAttempts = await this.redisService.get(`loginAttempts:${dto.email}`);
 
+        const ip = req.ip ?? 'unknown';
+        const ua = req.headers['user-agent'] ?? 'unknown';
+        const sessionId = randomUUID();
 
         if(userAttempts && +userAttempts >= mixCaptchaAttempts && +userAttempts < maxCancelledAttempts) {
             console.log(dto.recaptchaToken)
@@ -77,10 +80,9 @@ export class AuthController {
 
         await this.authService.checkUserAttempts(userAttempts, maxCancelledAttempts, dto.email);
 
-        const user = await this.authService.loginUser(dto);
-        const sessionId = randomUUID();
+        const user = await this.authService.loginUser(dto, ip, ua);
 
-        if(user.isVerified === false){
+        if(!user.isVerified){
            const verifyToken = randomUUID();
             await this.redisService.setVerifyToken(verifyToken, user.id); 
             res.cookie('verifyToken', verifyToken, {
@@ -94,10 +96,9 @@ export class AuthController {
         }
 
 
-        const ip = req.ip;
-        const userAgent = req.headers['user-agent'] ?? 'unknown';
+        
 
-        await this.authService.createSession(user.id, sessionId, user.role, ip, userAgent, res);
+        await this.authService.createSession(user.id, sessionId, user.role, ip, ua, res);
         await this.redisService.del(`loginAttempts:${dto.email}`);
 
         this.logerService.log(`User logged in successfully with email: ${dto.email}`);

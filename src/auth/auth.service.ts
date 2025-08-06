@@ -19,7 +19,7 @@ export class AuthService {
 
    
 
-    async loginUser(dto: LogInUserDto){
+    async loginUser(dto: LogInUserDto, ip: string, ua: string){
         try{
             const user = await this.prisma.user.findUnique({
                 where: {email: dto.email.toLowerCase()}
@@ -41,6 +41,24 @@ export class AuthService {
 
             this.loggerService.log(`User has been logged in successfully with email: ${dto.email}`);
 
+            if(user.isVerified){
+                if(this.normalizeIp(user.ip) !== this.normalizeIp(ip) ){
+                    this.prisma.securityLog.create({
+                        data: {
+                            personID: user.id,
+                            eventType: 'ip_mismatch',
+                            ipAddress: ip,
+                            userAgent: ua,
+                            description: 'IP does not match expected',
+                            isResolved: false,
+                        }
+                    })
+                }
+                if(user.ua !== ua){
+                    this.loggerService.error(`IP or User Agent mismatch for user with email: ${dto.email}`);
+                }
+            }
+
             return user;
         }catch(error) {
             this.loggerService.error(`Error logging in user with email: ${dto.email}`, error);
@@ -50,6 +68,13 @@ export class AuthService {
             throw new InternalServerErrorException('An error occurred while logging in');
         };
     };
+
+    normalizeIp(ip: string | undefined): string{
+        if(!ip) return '';
+        if(ip.includes('::ffff:')) ip = ip.split('::ffff:')[1];
+        const parts = ip.split('.');
+        return parts.length >= 2 ? `${parts[0]}.${parts[1]}` : ip;
+    }
 
     async createSession(userId: number, sessionId: string, userRole: string | null, ip: string | undefined, userAgent: string, res: Response) {
         try{
