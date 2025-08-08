@@ -34,8 +34,8 @@ export class UserService {
           createdat: new Date(),
           is2FA: false, // Default value,
           isVerified: false, // Default value
-          ip: ip, 
-          ua: ua
+          ip: 'unknown', 
+          ua: 'unknown',
         },
       });
 
@@ -81,7 +81,6 @@ export class UserService {
    }
 
    async findUserByEmail(email: string): Promise<{email: string, id: number, role: string | null}> {
-
     try{
       const user = await this.prisma.user.findUnique({
         where: {email: email}
@@ -105,8 +104,9 @@ export class UserService {
   }
 
   async changePassword(password: string, userId: number): Promise<{id: number, role: string | null}> {
-    const hashedPassword = await bcrypt.hash(password + process.env.USER_PEPER, 10);
     try{
+      const hashedPassword = await bcrypt.hash(password + process.env.USER_PEPER, 10);
+      
       const user = await this.prisma.user.update({
         where: {id: userId},
         data: {password: hashedPassword}
@@ -140,6 +140,23 @@ export class UserService {
         throw error;
       }
       throw new InternalServerErrorException('An error occurred while verifying user');
+    }
+  }
+
+  async changeIPAndUA(userID: number, ip: string, ua: string): Promise<void> {
+    try{
+      await this.prisma.user.update({
+        where: {id: userID},
+        data: {ip: ip, ua: ua}
+      });
+
+      this.logger.log(`User with id ${userID} had their IP and UA updated successfully`);
+    }catch(error){
+      this.logger.error(`Error updating IP and UA for user with id: ${userID}`, error);
+      if(error instanceof BadRequestException){
+        throw error;
+      }
+      throw new InternalServerErrorException('An error occurred while updating user IP and UA');
     }
   }
 }
