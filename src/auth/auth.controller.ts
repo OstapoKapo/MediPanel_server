@@ -13,7 +13,7 @@ import { EmailService } from 'src/email/email.service';
 import { ChangePasswordDto } from 'src/common/dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
 import { BannedAccGuard } from 'src/common/guards/BannedAcc.guard';
-import { RecaptchaService } from 'src/recaptcha/recaptcha.service';
+import * as bcrypt from 'bcryptjs'
 
 
 
@@ -26,7 +26,6 @@ export class AuthController {
         private readonly logerService: LoggerService,
         private readonly redisService: RedisService,
         private readonly emailService: EmailService,
-        private readonly recaptchaService: RecaptchaService
     ) {}
 
     @UseGuards(SessionGuard)
@@ -55,55 +54,12 @@ export class AuthController {
         @Res({ passthrough: true }) res: Response,
         @Req() req: Request
     ){
-        const maxCancelledAttempts = 5;
-        const mixCaptchaAttempts = 3;
-        const userAttempts = await this.redisService.get(`loginAttempts:${dto.email}`);
-
         const ip = req.ip ?? 'unknown';
         const ua = req.headers['user-agent'] ?? 'unknown';
-        const sessionId = randomUUID();
 
-        if(userAttempts && +userAttempts >= mixCaptchaAttempts && +userAttempts < maxCancelledAttempts) {
-            console.log(dto.recaptchaToken)
-            if(!dto.recaptchaToken){
-                throw new UnauthorizedException('Recaptcha token is required');
-            }
-
-            console.log(dto.recaptchaToken)
-
-            const isValid = await this.recaptchaService.verifyToken(dto.recaptchaToken);
-            if(!isValid) {
-                this.logerService.error(`Invalid recaptcha token for email: ${dto.email}`);
-                throw new UnauthorizedException('Invalid recaptcha token');
-            }
-        }
-
-        await this.authService.checkUserAttempts(userAttempts, maxCancelledAttempts, dto.email);
-
-        const user = await this.authService.loginUser(dto, ip, ua);
-
-        if(!user.isVerified){
-           const verifyToken = randomUUID();
-            await this.redisService.setVerifyToken(verifyToken, user.id); 
-            res.cookie('verifyToken', verifyToken, {
-                httpOnly: true,
-                secure: false,
-                sameSite: 'lax',
-                maxAge: 30 * 60 * 1000, // 30 minutes
-            });
-            await this.redisService.del(`loginAttempts:${dto.email}`);
-            return { isVerified: false, message: 'User must change password' };
-        }
-
-
+        const { isVerified } = await this.authService.handleLogin(dto, { ip, ua, res });
         
-
-        await this.authService.createSession(user.id, sessionId, user.role, ip, ua, res);
-        await this.redisService.del(`loginAttempts:${dto.email}`);
-
-        this.logerService.log(`User logged in successfully with email: ${dto.email}`);
-
-        return {message: 'Logged In Successfully', isVerified: true};
+        return { message: 'Logged In Successfully', isVerified: isVerified };
     }
 
     @UseGuards(SessionGuard)
@@ -126,23 +82,7 @@ export class AuthController {
     ){
         this.logerService.log(`User is logging out...`);
         const sessionId = req.cookies.sessionId;
-        if(sessionId) {
-            await this.redisService.del(`session:${req.cookies.sessionId}`);
-        }
-
-        res.clearCookie('sessionId', {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-        });
-
-        res.clearCookie('csrfToken', {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-        });
-
-        this.logerService.log(`User logged out successfully`);
+        await this.authService.handleLogOut(sessionId, res);
         return {message: 'Logged Out Successfully'}
     }
 
@@ -154,25 +94,11 @@ export class AuthController {
         @Body() dto: ChangePasswordDto
     ){
         const verifyToken = req.cookies.verifyToken;
-        if(!verifyToken) throw new UnauthorizedException('Verify token is missing');
-        
-        const data = await this.redisService.get<{value: number}>(`verifyToken:${verifyToken}`);
-        if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
-        await this.userService.changeIsVerified(data.value)
-        const user = await this.userService.changePassword(dto.newPassword, data.value);
-
-        await this.redisService.del(`verifyToken:${verifyToken}`);
-        res.clearCookie('verifyToken', {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-        });
-
         const sessionId = randomUUID();
-        const ip = req.ip;
-        const userAgent = req.headers['user-agent'] || 'unknown';
-
-        await this.authService.createSession(user.id, sessionId, user.role, ip, userAgent, res);
+        const ip = req.ip ?? 'unknown';
+        const userAgent = req.headers['user-agent'] ?? 'unknown';
+        if(!verifyToken) throw new UnauthorizedException('Verify token is missing');
+        await this.authService.handleVerifyPassword(verifyToken, ip, userAgent, dto.newPassword, res, sessionId);
         return {message: 'Password changed successfully'};
     }
 
@@ -187,7 +113,7 @@ export class AuthController {
         const data = await this.redisService.get<{userId: number}>(`verifyToken:${token}`);
         if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
 
-        return {userId: data.userId, message: 'Verify token is valid'};
+        return {verifyToken: true, message: 'Verify token is valid'};
     }
 }
 
