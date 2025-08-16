@@ -1,27 +1,18 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthService } from 'src/auth/auth.service';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { LoggerService } from 'src/logger/logger.service';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcryptjs';
-import { BadRequestException, InternalServerErrorException } from '@nestjs/common';
 import { mockUser } from '../mocks/index';
+import { RedisService } from 'src/redis/redis.service';
+import { Response } from 'express';
+import { UserService } from 'src/user/user.service';
+import { LoggerService } from 'src/logger/logger.service';
+import { RecaptchaService } from 'src/recaptcha/recaptcha.service';
 
 describe('AuthService', () => {
   let service: AuthService;
-  let prisma: PrismaService;
-  let jwtService: JwtService;
-
-
-  interface ILoginDto {
-    email: string;
-    password: string;
-  }
-
-  const dto: ILoginDto = {
-    email: 'test@example.com',
-    password: 'plainPassword', 
-  };
+  let redis: RedisService;
+  let res: Response;
+  let userService: UserService
 
 
   beforeEach(async () => {
@@ -38,125 +29,194 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: LoggerService,
+          provide: UserService,
           useValue: {
-            log: jest.fn(),
-            error: jest.fn(),
+            findUserById: jest.fn(),
+            changeIsVerified: jest.fn(),
+            create: jest.fn(),
+            changeIPAndUA: jest.fn(),
+            changePassword: jest.fn()
           }
         },
         {
-          provide: JwtService,
+          provide: RecaptchaService,
           useValue: {
-            signAsync: jest.fn(),
+            verifyToken: jest.fn(),
+          }
+        },
+        {
+          provide: LoggerService,
+            useValue: {
+              log: jest.fn(),
+              error: jest.fn(),
+              warn: jest.fn(),
+          }
+        },
+        {
+          provide: RedisService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn().mockResolvedValue(undefined),
+            del: jest.fn().mockResolvedValue(undefined),
+            incr: jest.fn().mockResolvedValue(0),
+            expire: jest.fn().mockResolvedValue(undefined),
+            setLoginAttempts: jest.fn().mockResolvedValue(undefined),
+            setBannedUser: jest.fn().mockResolvedValue(undefined),
+            setVerifyToken: jest.fn().mockResolvedValue(undefined),
+            setSession: jest.fn().mockResolvedValue(undefined),
+            multi: jest.fn().mockReturnValue({ exec: jest.fn() }),
+          }
+        },
+        {
+          provide: 'Response',
+          useValue: {
+            clearCookie: jest.fn()
           }
         }
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
-    prisma = module.get<PrismaService>(PrismaService);
-    jwtService = module.get<JwtService>(JwtService);
+    redis = module.get<RedisService>(RedisService);
+    res = module.get<Response>('Response');
+    userService = module.get<UserService>(UserService);
   });
 
-  describe('generateToken', () => {
-    it('should generate token for user', async () => {
-      (jwtService.signAsync as jest.Mock).mockResolvedValue('mockedToken');
+  describe('handleLogOut', () => {
+    it('should handle user logout', async () => {
+      const sessionId = 'session123';
 
-      const token = await service.generateToken(mockUser);
+      await service.handleLogOut(sessionId, res);
 
-      expect(jwtService.signAsync).toHaveBeenCalledWith({
-        sub: mockUser.id,
-        email: mockUser.email,
-        role: mockUser.role,
+      expect(redis.del).toHaveBeenCalledWith(`session:${sessionId}`);
+      expect(res.clearCookie).toHaveBeenCalledWith('sessionId', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
       });
-
-      expect(jwtService.signAsync).toHaveBeenCalledTimes(1);
-      expect(token).toBe('mockedToken');
+      expect(res.clearCookie).toHaveBeenCalledWith('csrfToken', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
+      });
     });
-    it('should throw an error if token generation fails', async () => {
-      (jwtService.signAsync as jest.Mock).mockRejectedValue(new Error('An error occurred while generating token'));
 
-      await expect(service.generateToken(mockUser)).rejects.toThrow(InternalServerErrorException);
+    it('should now call redis.del if sessionId is not provided', async () => {
+      await service.handleLogOut('', res);
 
-      expect(jwtService.signAsync).toHaveBeenCalledWith({
-        sub: mockUser.id,
-        email: mockUser.email,
-        role: mockUser.role,
-      });
+      expect(redis.del).not.toHaveBeenCalled();
+      expect(res.clearCookie).toHaveBeenCalledTimes(2);
+    });
 
-      expect(jwtService.signAsync).toHaveBeenCalledTimes(1);
+    it('should throw InternalServerErrorException on error', async () => {
+      (redis.del as jest.Mock).mockRejectedValue(new Error('Redis error'));
+
+      await expect(service.handleLogOut('session123', res)).rejects.toThrow('An error occurred while logging out');
     });
   });
 
-  describe('loginUser', () => {
-    it('should log in user with valid credentials', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (jest.spyOn(bcrypt, 'compare') as jest.Mock).mockResolvedValue(true);
+  describe('handleVerifyPassword', () => {
+    it('it should verify user, delete token. clear cookie, and create session', async () => {
+      (redis.get as jest.Mock).mockResolvedValue({value: mockUser.id})
+      (userService.findUserById as jest.Mock).mockResolvedValue(mockUser);
+      jest.spyOn(Object.getPrototypeOf(service), 'createSession').mockResolvedValue(undefined);
 
-      const user = await service.loginUser(dto);
 
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: dto.email }
+      await service.handleVerifyPassword('token123', '127.0.0.1', 'ua', 'newPass', res, 'session123');
+
+      expect(userService.findUserById).toHaveBeenCalledWith(mockUser.id);
+      expect(userService.changeIPAndUA).toHaveBeenCalledWith(mockUser.id, '127.0.0.1', 'ua');
+      expect(userService.changeIsVerified).toHaveBeenCalledWith(mockUser.id);
+      expect(userService.changePassword).toHaveBeenCalledWith('newPass', mockUser.id);
+
+      expect(redis.del).toHaveBeenCalledWith(`verifyToken:${'token123'}`);
+      expect(res.clearCookie).toHaveBeenCalledWith('verifyToken', {
+        httpOnly: true,
+        secure: false,
+        sameSite: 'lax'
       });
-
-      expect(bcrypt.compare).toHaveBeenCalledWith(dto.password + process.env.USER_PEPER, mockUser.password);
-      expect(user).toEqual(mockUser);
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
-      expect(bcrypt.compare).toHaveBeenCalledTimes(1);
+      expect(service['createSession']).toHaveBeenCalledWith(
+        1,
+        'sess123',
+        'USER',
+        '127.0.0.1',
+        'ua',
+        res
+      );
     });
 
-    it('should throw BadRequestExpection if user not found', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    it('should throw UnauthorizedException if verify token is not found', async () => {
+      (redis.get as jest.Mock).mockResolvedValue(null);
 
-      const promise = service.loginUser(dto);
+      await expect(service.handleVerifyPassword('token123', '127.0.0.1', 'ua', 'newPass', res, 'session123')).rejects.toThrow('Verify token is invalid or expired');
 
-      await expect(promise).rejects.toThrow(BadRequestException);
-      await expect(promise).rejects.toThrow('Some of the fields are incorrect');
-
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+      expect(redis.get).toHaveBeenCalledWith(`verifyToken:${'token123'}`);
     });
 
-    it('should throw BadRequestExpection if password in invalid', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (jest.spyOn(bcrypt, 'compare') as jest.Mock).mockResolvedValue(false);
+    it('should throw InternalServerErrorException on unexpected error', async () => {
+      (redis.get as jest.Mock).mockRejectedValue(new Error('Redis error'));
 
-      const promise = service.loginUser(dto);
+      await expect(service.handleVerifyPassword('token123', '127.0.0.1', 'ua', 'newPass', res, 'session123')).rejects.toThrow('An error occurred while verifying');
+    });
+  });
 
-      await expect(promise).rejects.toThrow(BadRequestException);
-      await expect(promise).rejects.toThrow('Some of the fields are incorrect');
-
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: {email: dto.email}
-      });
-
-      expect(bcrypt.compare).toHaveBeenCalledWith(dto.password + process.env.USER_PEPER, mockUser.password);
-
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
-      expect(bcrypt.compare).toHaveBeenCalledTimes(1);
+  describe('handleLogin', () => {
+    beforeEach(() => {
+      jest.spyOn(Object.getPrototypeOf(service), 'createSession').mockResolvedValue(undefined);
+      jest.spyOn(Object.getPrototypeOf(service), 'validateUserAttempts').mockResolvedValue(undefined);
+      jest.spyOn(Object.getPrototypeOf(service), 'validateUser').mockResolvedValue(mockUser);
+      jest.spyOn(Object.getPrototypeOf(service), 'createUnverifiedUser').mockResolvedValue(undefined);
     });
 
-    it('should throw InternalServerErrorException if in Darabase an error occurs', async () => {
-      (prisma.user.findUnique as jest.Mock).mockRejectedValue(new Error('Datavase eror'));
+    it('should login verified user successfully', async () => {
+      (redis.get as jest.Mock).mockResolvedValue(0);
+      (redis.del as jest.Mock).mockResolvedValue(undefined);
 
-      const promise = service.loginUser(dto);
+      const result = await service.handleLogin(
+        { email: mockUser.email, password: 'pass', recaptchaToken: 'token' },
+        { ip: '127.0.0.1', ua: 'ua', res }
+      );
 
-      await expect(promise).rejects.toThrow(InternalServerErrorException);
-      await expect(promise).rejects.toThrow('An error occurred while logging in');
-
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
+      expect(service['validateUserAttempts']).toHaveBeenCalledWith(0, mockUser.email, 'token');
+      expect(service['validateUser']).toHaveBeenCalledWith(
+        { email: mockUser.email, password: 'pass', recaptchaToken: 'token' },
+        '127.0.0.1',
+        'ua'
+      );
+      expect(service['createSession']).toHaveBeenCalledWith(
+        mockUser.id,
+        expect.any(String),
+        mockUser.role,
+        '127.0.0.1',
+        'ua',
+        res
+      );
+      expect(redis.del).toHaveBeenCalledWith(`loginAttempts:${mockUser.email}`);
+      expect(result).toEqual({ isVerified: true });
     });
 
-    it('should throw InternalServerErrorException if bcrypt compare fails', async () => {
-      (prisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
-      (jest.spyOn(bcrypt, 'compare') as jest.Mock).mockRejectedValue(new Error('Bcrypt error'));
+    it('should return isVerified: false for unverified user', async () => {
+      const unverifiedUser = { ...mockUser, isVerified: false };
+      (service as any).validateUser.mockResolvedValueOnce(unverifiedUser);
 
-      const promise = service.loginUser(dto);
+      const result = await service.handleLogin(
+        { email: mockUser.email, password: 'pass', recaptchaToken: 'token' },
+        { ip: '127.0.0.1', ua: 'ua', res }
+      );
 
-      await expect(promise).rejects.toThrow(InternalServerErrorException);
-      await expect(promise).rejects.toThrow('An error occurred while logging in');
+      expect(service['createUnverifiedUser']).toHaveBeenCalledWith(unverifiedUser.id, res, mockUser.email);
+      expect(result).toEqual({ isVerified: false });
+    });
 
-      expect(prisma.user.findUnique).toHaveBeenCalledTimes(1);
-      expect(bcrypt.compare).toHaveBeenCalledTimes(1);
+    it('should throw InternalServerErrorException on unexpected error', async () => {
+      (service as any).validateUser.mockRejectedValueOnce(new Error('DB error'));
+
+      await expect(
+        service.handleLogin(
+          { email: mockUser.email, password: 'pass', recaptchaToken: 'token' },
+          { ip: '127.0.0.1', ua: 'ua', res }
+        )
+      ).rejects.toThrow('An error occurred while logging in');
     });
   });
 });

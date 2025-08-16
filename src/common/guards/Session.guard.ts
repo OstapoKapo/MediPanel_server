@@ -4,7 +4,7 @@ import { Request } from "express";
 
 
 interface AuthenticatedReq extends Request {
-    userId: number;
+    userID: number;
 }
 
 @Injectable()
@@ -17,7 +17,7 @@ export class SessionGuard implements CanActivate{
        if(!sessionId) throw new UnauthorizedException('Session ID is missing');
 
        const sessionKey = `session:${sessionId}`;
-       const session = await this.redisService.get<{ userId: number; userRole: string; ip:string; userAgent: string }>(sessionKey);
+       const session = await this.redisService.get<{ userID: number; userRole: string; ip:string; userAgent: string }>(sessionKey);
        if(!session) throw new UnauthorizedException('Session not found');
 
        await this.redisService.expire(sessionKey, 3600);
@@ -30,7 +30,7 @@ export class SessionGuard implements CanActivate{
     //     throw new UnauthorizedException('User agent mismatch');
     //    }
 
-       (req as AuthenticatedReq).userId = session.userId;
+       (req as AuthenticatedReq).userID = session.userID;
        return true
     }
 

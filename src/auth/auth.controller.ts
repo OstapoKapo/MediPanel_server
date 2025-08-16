@@ -8,12 +8,11 @@ import { LogInUserDto } from 'src/common/dto/login-user.dto';
 import {randomUUID} from 'crypto';
 import { RedisService } from 'src/redis/redis.service';
 import { SessionGuard } from 'src/common/guards/Session.guard';
-import { UserId } from './user-id.decorator';
+import { userID } from './user-id.decorator';
 import { EmailService } from 'src/email/email.service';
 import { ChangePasswordDto } from 'src/common/dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
 import { BannedAccGuard } from 'src/common/guards/BannedAcc.guard';
-import * as bcrypt from 'bcryptjs'
 
 
 
@@ -33,13 +32,9 @@ export class AuthController {
     @Throttle({ default: { limit: 5, ttl: 60 } }) // create custom throttler guard
     @HttpCode(HttpStatus.CREATED)
     async signUp(
-        @Req() req: Request,
         @Body() dto: CreateUserDto,
     ){
-      const ip = req.ip ?? 'unknown';
-      const ua = req.headers['user-agent'] ?? 'unknown';
-        
-      const data = await this.userService.createUser(dto, ip, ua);  
+      const data = await this.userService.createUser(dto);  
       await this.emailService.sendWelcomeEmail('OstapoKapo@gmail.com', 'Welcome to MEDIPANEL!', data); // need verify domain and then we can send to another people
       this.logerService.log(`User created successfully with email: ${dto.email}`);   
       return {message: 'ok'}  
@@ -66,11 +61,19 @@ export class AuthController {
     @Get('checkSession')
     @HttpCode(HttpStatus.OK)
     async checkSession(
-        @UserId() userId: number
+        @userID() userID: number
     ){
-        const user = await this.userService.findUserById(userId);
-        this.logerService.log(`Session checked successfully for user with id: ${userId}`);
-        return {user}   
+        const user = await this.userService.findUserById(userID);
+        this.logerService.log(`Session checked successfully for user with id: ${userID}`);
+        return {
+            email: user.email,
+            id: user.id,
+            role: user.role,
+            isVerified: user.isVerified,
+            is2FA: user.is2FA,
+            ip: user.ip,
+            ua: user.ua
+        };
     }
 
     @UseGuards(SessionGuard)
@@ -110,7 +113,7 @@ export class AuthController {
         const token = req.cookies.verifyToken;
         if(!token) throw new UnauthorizedException('Verify token is missing');
 
-        const data = await this.redisService.get<{userId: number}>(`verifyToken:${token}`);
+        const data = await this.redisService.get<{userID: number}>(`verifyToken:${token}`);
         if(!data) throw new UnauthorizedException('Verify token is invalid or expired');
 
         return {verifyToken: true, message: 'Verify token is valid'};
