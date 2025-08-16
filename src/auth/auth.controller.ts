@@ -13,7 +13,6 @@ import { EmailService } from 'src/email/email.service';
 import { ChangePasswordDto } from 'src/common/dto/change-password.dto';
 import { Throttle } from '@nestjs/throttler';
 import { BannedAccGuard } from 'src/common/guards/BannedAcc.guard';
-import DataHandler from 'ioredis/built/DataHandler';
 
 
 

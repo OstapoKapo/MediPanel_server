@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import { LoggerService } from 'src/logger/logger.service';
 import { LogInUserDto } from 'src/common/dto/login-user.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
