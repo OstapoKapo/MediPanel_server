@@ -12,8 +12,7 @@ export class UserService {
     private readonly logger: LoggerService, // Assuming you have a LoggerService for logging
    ) {}
 
-   async createUser(dto: CreateUserDto, ip: string, ua: string): Promise<string> {
-
+   async createUser(dto: CreateUserDto): Promise<string> {
     try{
       const existingUser = await this.prisma.user.findUnique({
         where: {email: dto.email.toLowerCase()}
@@ -50,7 +49,7 @@ export class UserService {
       }
    }
 
-   async findUserById(id: number): Promise<{email: string, id: number, role: string | null, isVerified: boolean | null, is2FA: boolean | null}> {
+   async findUserById(id: number): Promise<{email: string, id: number, role: string | null, isVerified: boolean , is2FA: boolean, ip: string, ua: string}> {
 
     try{
       const user = await this.prisma.user.findUnique({
@@ -64,13 +63,7 @@ export class UserService {
 
       this.logger.log(`User found successfully --${id}`);
 
-      return {
-        email: user.email,
-        id: user.id,
-        role: user.role,
-        isVerified: user.isVerified,
-        is2FA: user.is2FA
-      };
+      return user
     }catch(error){
       this.logger.error(`Error finding user with id: ${id}`, error);
       if(error instanceof BadRequestException){
@@ -103,22 +96,21 @@ export class UserService {
     }
   }
 
-  async changePassword(password: string, userId: number): Promise<{id: number, role: string | null}> {
+  async changePassword(password: string, userID: number): Promise<void>{
     try{
       const hashedPassword = await bcrypt.hash(password + process.env.USER_PEPER, 10);
       
       const user = await this.prisma.user.update({
-        where: {id: userId},
+        where: {id: userID},
         data: {password: hashedPassword}
       });
+      if(!user){
+        throw new BadRequestException('User not found');
+      }
 
-      this.logger.log(`Password changed successfully for user with id: ${userId}`);
-      return {
-        id: user.id,
-        role: user.role
-      };
+      this.logger.log(`Password changed successfully for user with id: ${userID}`);
     }catch(error){
-      this.logger.error(`Error changing password for user with id: ${userId}`, error);
+      this.logger.error(`Error changing password for user with id: ${userID}`, error);
       if(error instanceof BadRequestException){
         throw error;
       }
@@ -126,16 +118,19 @@ export class UserService {
     }
   }
 
-  async changeIsVerified(userId: number): Promise<void> {
+  async changeIsVerified(userID: number): Promise<void> {
     try{
-      await this.prisma.user.update({
-        where: {id: userId},
+      const user = await this.prisma.user.update({
+        where: {id: userID},
         data: {isVerified: true}
       });
+      if(!user){
+        throw new BadRequestException('User not found');
+      }
 
-      this.logger.log(`User with id ${userId} is verified successfully`);
+      this.logger.log(`User with id ${userID} is verified successfully`);
     }catch(error){
-      this.logger.error(`Error verifying user with id: ${userId}`, error);
+      this.logger.error(`Error verifying user with id: ${userID}`, error);
       if(error instanceof BadRequestException){
         throw error;
       }
@@ -145,10 +140,13 @@ export class UserService {
 
   async changeIPAndUA(userID: number, ip: string, ua: string): Promise<void> {
     try{
-      await this.prisma.user.update({
+      const user = await this.prisma.user.update({
         where: {id: userID},
         data: {ip: ip, ua: ua}
       });
+      if(!user){
+        throw new BadRequestException('User not found');
+      }
 
       this.logger.log(`User with id ${userID} had their IP and UA updated successfully`);
     }catch(error){

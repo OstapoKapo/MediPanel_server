@@ -53,7 +53,7 @@ export class RedisService implements OnModuleInit {
         await this.set(`verifyToken:${verifyToken}`, {value}, RedisTTL.VERIFY_TOKEN);
     }
 
-    async setSession(sessionId: string, value: { userId: number; userRole: string | null; ip: string | undefined ; userAgent: string, csrfToken: string }) {
+    async setSession(sessionId: string, value: { userID: number; userRole: string | null; ip: string | undefined ; userAgent: string, csrfToken: string }) {
         await this.set(`session:${sessionId}`, value, RedisTTL.SESSION);
     }
 }
